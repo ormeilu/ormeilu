@@ -61,7 +61,11 @@ def stitch(x, y, p, fill, extra=""):
     )
 
 
-def tile_pattern(pid, tile, p):
+def tile_pattern(pid, tile, p, x0=0, y0=0):
+    # A userSpaceOnUse pattern tiles from the SVG origin unless told
+    # otherwise, so the band has to pass its own corner: without x0/y0 a band
+    # that starts at y=129 shows the bottom half of one row of motifs and the
+    # top half of the next.
     w, h = len(tile[0]) * p, len(tile) * p
     cells = "".join(
         stitch(k * p, r * p, p, RED if c == "R" else FOLK)
@@ -70,8 +74,9 @@ def tile_pattern(pid, tile, p):
         if c != "."
     )
     return (
-        f'<pattern id="{pid}" width="{w}" height="{h}" patternUnits="userSpaceOnUse">'
-        f"{cells}</pattern>",
+        f'<pattern id="{pid}" x="{x0}" y="{y0}" width="{w}" height="{h}" '
+        f'patternUnits="userSpaceOnUse">{cells}</pattern>',
+        w,
         h,
     )
 
@@ -101,9 +106,16 @@ def svg(w, h, body, label):
 
 
 def header(user):
-    w, h = 900, 190
+    w, h = 900, 230
     p = 5
-    pat, band_h = tile_pattern("rushnyk", RUSHNYK, p)
+    tile_w = len(RUSHNYK[0]) * p
+    # whole motifs only, plus the first column of the next tile so the band
+    # closes on a diamond tip the way it opens; centred inside the card
+    band_w = (w - 48 - p) // tile_w * tile_w + p
+    band_x = (w - band_w) / 2
+    band_h = len(RUSHNYK) * p
+    band_y = h - band_h - 22
+    pat, _, _ = tile_pattern("rushnyk", RUSHNYK, p, band_x, band_y)
     # a big stitched diamond on the left, same geometry as the rolter mark
     diamond = []
     n, cell = 9, 9
@@ -131,7 +143,7 @@ def header(user):
 <text x="150" y="70" class="t" font-size="34" font-weight="600" fill="{TEXT}">{user['name']}</text>
 <text x="151" y="98" class="m" font-size="15" fill="{MUTED}">@ormeilu</text>
 <text x="151" y="124" class="t" font-size="15" fill="{SUBTLE}">LLM agents, Python, Rust, Mojo</text>
-<rect x="0" y="{h - band_h - 6}" width="{w}" height="{band_h}" fill="url(#rushnyk)" opacity=".85"/>
+<rect x="{band_x}" y="{band_y}" width="{band_w}" height="{band_h}" fill="url(#rushnyk)" opacity=".85"/>
 """
     return svg(w, h, body, f"{user['name']} - GitHub profile header")
 
@@ -209,7 +221,7 @@ def stats(user):
     w, h = 900, 110
     col = w / len(rows)
     p = 5
-    pat, band_h = tile_pattern("dots", ["F.", ".."], p)
+    pat, _, _ = tile_pattern("dots", ["F.", ".."], p, 24, h - 14)
     items = "".join(
         f'<text x="{col * i + col / 2:.0f}" y="54" text-anchor="middle" class="m" font-size="30" '
         f'font-weight="600" fill="{RED if i == 0 else TEXT}">{v:,}</text>'
