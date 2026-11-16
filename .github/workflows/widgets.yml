@@ -1,7 +1,7 @@
 # Renders the profile widgets (scripts/render.py) from the GitHub GraphQL API
 # and force-pushes them as the only commit on the `output` branch, which the
-# README links to through raw.githubusercontent.com. Keeping them off main
-# means the daily refresh never adds a commit to the history people read.
+# README links to through raw.githubusercontent.com. Keeping them off master
+# means the daily refresh never adds a commit to master's history.
 name: widgets
 
 on:
@@ -9,7 +9,7 @@ on:
     - cron: "17 3 * * *"
   workflow_dispatch:
   push:
-    branches: [main, widgets]
+    branches: [master]
     paths: [scripts/**, .github/workflows/widgets.yml]
 
 permissions:
