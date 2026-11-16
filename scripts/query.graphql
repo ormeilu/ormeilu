@@ -1,0 +1,18 @@
+query($u: String!) {
+  user(login: $u) {
+    name
+    contributionsCollection {
+      totalCommitContributions
+      totalPullRequestContributions
+      totalPullRequestReviewContributions
+      restrictedContributionsCount
+      contributionCalendar {
+        totalContributions
+        weeks { contributionDays { date contributionCount contributionLevel weekday } }
+      }
+    }
+    repositories(ownerAffiliations: OWNER, privacy: PUBLIC, first: 100) {
+      nodes { stargazerCount }
+    }
+  }
+}
