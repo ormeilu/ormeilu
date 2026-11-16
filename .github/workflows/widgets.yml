@@ -1,0 +1,47 @@
+# Renders the profile widgets (scripts/render.py) from the GitHub GraphQL API
+# and force-pushes them as the only commit on the `output` branch, which the
+# README links to through raw.githubusercontent.com. Keeping them off master
+# means the daily refresh never adds a commit to master's history.
+name: widgets
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths: [scripts/**, .github/workflows/widgets.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: widgets
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch contributions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGIN: ${{ github.repository_owner }}
+        run: gh api graphql -f u="$LOGIN" -F query=@scripts/query.graphql > user.json
+
+      - name: Render
+        run: python3 -I scripts/render.py user.json dist
+
+      - name: Publish to the output branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd dist
+          git init -q -b output
+          git add .
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "render widgets for ${{ github.sha }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" output
