@@ -61,24 +61,29 @@ def stitch(x, y, p, fill, extra=""):
     )
 
 
-def tile_pattern(pid, tile, p, x0=0, y0=0):
-    # A userSpaceOnUse pattern tiles from the SVG origin unless told
-    # otherwise, so the band has to pass its own corner: without x0/y0 a band
-    # that starts at y=129 shows the bottom half of one row of motifs and the
-    # top half of the next.
-    w, h = len(tile[0]) * p, len(tile) * p
+def band(tile, p, max_width, y, canvas_w):
+    """A divider of whole stitches, centred, that ends the way it starts.
+
+    Repeating a tile n times leaves the next tile's lead-in hanging off the
+    right end (the rushnyk's connecting thread, the dot rule's last dot cut
+    in half), so the last column of the last tile is dropped: n * cols - 1
+    columns. Every row must then read the same from both ends, which is
+    checked here, so a tile edit that breaks the symmetry fails the render.
+    """
+    cols = len(tile[0])
+    n = (max_width // p + 1) // cols
+    rows = [(row * n)[: n * cols - 1] for row in tile]
+    for row in rows:
+        assert row == row[::-1], f"divider row is not symmetric: {row!r}"
+    width = len(rows[0]) * p
+    x0 = (canvas_w - width) / 2
     cells = "".join(
-        stitch(k * p, r * p, p, RED if c == "R" else FOLK)
-        for r, row in enumerate(tile)
+        stitch(x0 + k * p, y + r * p, p, RED if c == "R" else FOLK)
+        for r, row in enumerate(rows)
         for k, c in enumerate(row)
         if c != "."
     )
-    return (
-        f'<pattern id="{pid}" x="{x0}" y="{y0}" width="{w}" height="{h}" '
-        f'patternUnits="userSpaceOnUse">{cells}</pattern>',
-        w,
-        h,
-    )
+    return cells, len(tile) * p
 
 
 FONTS = Path(__file__).parent / "fonts"
@@ -108,14 +113,8 @@ def svg(w, h, body, label):
 def header(user):
     w, h = 900, 230
     p = 5
-    tile_w = len(RUSHNYK[0]) * p
-    # whole motifs only, plus the first column of the next tile so the band
-    # closes on a diamond tip the way it opens; centred inside the card
-    band_w = (w - 48 - p) // tile_w * tile_w + p
-    band_x = (w - band_w) / 2
     band_h = len(RUSHNYK) * p
-    band_y = h - band_h - 22
-    pat, _, _ = tile_pattern("rushnyk", RUSHNYK, p, band_x, band_y)
+    rushnyk, _ = band(RUSHNYK, p, w - 64, h - band_h - 22, w)
     # a big stitched diamond on the left, same geometry as the rolter mark
     diamond = []
     n, cell = 9, 9
@@ -130,7 +129,6 @@ def header(user):
             elif d == 0:
                 diamond.append(stitch(40 + c * cell, 22 + r * cell, cell, RED))
     body = f"""
-<defs>{pat}</defs>
 <style>
   .t {{ font-family: {FONT}; }}
   .m {{ font-family: {MONO}; }}
@@ -143,7 +141,7 @@ def header(user):
 <text x="150" y="70" class="t" font-size="34" font-weight="600" fill="{TEXT}">{user['name']}</text>
 <text x="151" y="98" class="m" font-size="15" fill="{MUTED}">@ormeilu</text>
 <text x="151" y="124" class="t" font-size="15" fill="{SUBTLE}">LLM agents, Python, Rust, Mojo</text>
-<rect x="{band_x}" y="{band_y}" width="{band_w}" height="{band_h}" fill="url(#rushnyk)" opacity=".85"/>
+<g opacity=".85">{rushnyk}</g>
 """
     return svg(w, h, body, f"{user['name']} - GitHub profile header")
 
@@ -221,7 +219,7 @@ def stats(user):
     w, h = 900, 110
     col = w / len(rows)
     p = 5
-    pat, _, _ = tile_pattern("dots", ["F.", ".."], p, 24, h - 14)
+    dots, _ = band(["F."], p, w - 64, h - 14, w)
     items = "".join(
         f'<text x="{col * i + col / 2:.0f}" y="54" text-anchor="middle" class="m" font-size="30" '
         f'font-weight="600" fill="{RED if i == 0 else TEXT}">{v:,}</text>'
@@ -234,10 +232,9 @@ def stats(user):
         for i in range(1, len(rows))
     )
     body = f"""
-<defs>{pat}</defs>
 <style> .t {{ font-family: {FONT}; }} .m {{ font-family: {MONO}; }} </style>
 <rect width="{w}" height="{h}" rx="12" fill="{BG}"/>
-<rect x="24" y="{h - 14}" width="{w - 48}" height="{p}" fill="url(#dots)" opacity=".7"/>
+<g opacity=".7">{dots}</g>
 {seps}{items}
 """
     return svg(w, h, body, "GitHub activity in the last year")
